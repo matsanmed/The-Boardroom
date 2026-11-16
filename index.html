@@ -130,7 +130,7 @@
                     <div class="h-4 w-[1px] bg-slate-700 mx-0.5"></div>
                     <button onclick="openAISettings()" title="Chave da API (opcional)" class="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
                         <i class="ph-fill ph-cpu text-base text-emerald-400"></i>
-                        <span>IA</span>
+                        <span id="aiProviderLabel">IA</span>
                     </button>
                     <div class="h-4 w-[1px] bg-slate-700 mx-0.5"></div>
                     <button onclick="openRolesModal()" title="Cargos e Personalidades" class="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
@@ -428,14 +428,31 @@
                 <h3 class="text-base font-bold text-white">Inteligência Artificial dos Funcionários</h3>
                 <button onclick="closeAISettings()" class="text-slate-400 hover:text-white p-1.5 rounded-lg"><i class="ph ph-x text-lg"></i></button>
             </div>
-            <p class="text-xs text-slate-400 leading-relaxed">Cada funcionário é uma IA (Claude) que lê as suas falas, as diretrizes e os documentos anexados, e responde com base neles. Dentro do Claude não precisa de chave. Se abrir este arquivo no seu computador, cole abaixo a sua chave da API Anthropic.</p>
-            <div class="space-y-1">
-                <label class="text-xs font-bold uppercase tracking-wider text-emerald-300 block">Chave da API Anthropic (opcional)</label>
-                <input id="apiKeyInput" type="password" placeholder="sk-ant-..." class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none selectable-text">
-                <p class="text-[11px] text-slate-500">A chave fica só nesta sessão e não é salva em lugar nenhum.</p>
+            <p class="text-xs text-slate-400 leading-relaxed">Escolha o provedor de IA, cole a chave e, se quiser, o modelo. Os funcionários usarão o provedor escolhido. Dentro do Claude, a Anthropic funciona sem chave.</p>
+            <div class="space-y-3">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold uppercase tracking-wider text-emerald-300 block">Provedor</label>
+                    <select id="providerSelect" onchange="onProviderChange()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none">
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="openai">OpenAI (ChatGPT)</option>
+                        <option value="google">Google (Gemini)</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold uppercase tracking-wider text-emerald-300 block">Chave da API</label>
+                    <input id="apiKeyInput" type="password" class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none selectable-text">
+                    <p id="apiKeyHelp" class="text-[11px] text-slate-500"></p>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold uppercase tracking-wider text-emerald-300 block">Modelo (opcional)</label>
+                    <input id="apiModelInput" type="text" class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none selectable-text">
+                    <p class="text-[11px] text-slate-500">Deixe em branco para usar o modelo padrão do provedor.</p>
+                </div>
             </div>
-            <div class="flex justify-end pt-2 border-t border-slate-800">
-                <button onclick="closeAISettings()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-lg transition">Salvar</button>
+            <p class="text-[11px] text-slate-500">As chaves ficam só nesta sessão e não são salvas. Cada provedor cobra pelo próprio uso.</p>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="closeAISettings()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-5 py-2.5 rounded-xl text-xs transition">Cancelar</button>
+                <button onclick="saveAISettings()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-lg transition">Salvar</button>
             </div>
         </div>
     </div>
@@ -544,17 +561,73 @@
         state.apiKey = "";
         state.transcript = [];
 
+        const PROVIDERS = {
+            anthropic: { label: "Anthropic (Claude)", short: "Claude", defaultModel: "claude-sonnet-4-6", keyHint: "sk-ant-...", keyUrl: "console.anthropic.com", keyPrefix: "sk-ant-" },
+            openai: { label: "OpenAI (ChatGPT)", short: "ChatGPT", defaultModel: "gpt-4o", keyHint: "sk-...", keyUrl: "platform.openai.com/api-keys", keyPrefix: "sk-" },
+            google: { label: "Google (Gemini)", short: "Gemini", defaultModel: "gemini-2.5-flash", keyHint: "Cole sua chave do Gemini", keyUrl: "aistudio.google.com/apikey", keyPrefix: null }
+        };
+        state.provider = "anthropic";
+        state.editingProvider = "anthropic";
+        state.keys = {
+            anthropic: { key: "", model: "" },
+            openai: { key: "", model: "" },
+            google: { key: "", model: "" }
+        };
+
         function openAISettings() {
-            document.getElementById("apiKeyInput").value = state.apiKey;
+            document.getElementById("providerSelect").value = state.provider;
+            state.editingProvider = state.provider;
+            loadProviderFields();
             document.getElementById("aiSettingsModal").classList.remove("hidden");
         }
 
+        function loadProviderFields() {
+            const p = document.getElementById("providerSelect").value;
+            const cfg = state.keys[p];
+            document.getElementById("apiKeyInput").value = cfg.key;
+            document.getElementById("apiKeyInput").placeholder = PROVIDERS[p].keyHint;
+            document.getElementById("apiModelInput").value = cfg.model;
+            document.getElementById("apiModelInput").placeholder = PROVIDERS[p].defaultModel;
+            document.getElementById("apiKeyHelp").innerText = `Crie sua chave em ${PROVIDERS[p].keyUrl}.`;
+        }
+
+        function saveEditingFields() {
+            state.keys[state.editingProvider] = {
+                key: document.getElementById("apiKeyInput").value.trim(),
+                model: document.getElementById("apiModelInput").value.trim()
+            };
+        }
+
+        function onProviderChange() {
+            saveEditingFields();
+            state.editingProvider = document.getElementById("providerSelect").value;
+            loadProviderFields();
+        }
+
         function closeAISettings() {
-            state.apiKey = document.getElementById("apiKeyInput").value.trim();
             document.getElementById("aiSettingsModal").classList.add("hidden");
-            appendSystemMessage(state.apiKey
-                ? "🔑 Chave de API salva nesta sessão."
-                : "🔑 Sem chave: as IAs só respondem se este arquivo estiver rodando dentro do Claude.");
+        }
+
+        function saveAISettings() {
+            saveEditingFields();
+            const p = document.getElementById("providerSelect").value;
+            state.provider = p;
+            state.editingProvider = p;
+            document.getElementById("aiProviderLabel").innerText = PROVIDERS[p].short;
+            document.getElementById("aiSettingsModal").classList.add("hidden");
+
+            const cfg = state.keys[p];
+            const modelo = cfg.model || PROVIDERS[p].defaultModel;
+            const nome = PROVIDERS[p].label;
+            if (!cfg.key && p !== "anthropic") {
+                appendSystemMessage(`⚠️ Nenhuma chave informada para ${nome}. As IAs não vão responder.`);
+            } else if (!cfg.key) {
+                appendSystemMessage("🔑 Sem chave Anthropic: funciona apenas dentro do Claude.");
+            } else if (PROVIDERS[p].keyPrefix && !cfg.key.startsWith(PROVIDERS[p].keyPrefix)) {
+                appendSystemMessage(`⚠️ Essa chave não tem o formato esperado para ${nome} (começa com ${PROVIDERS[p].keyPrefix}). Confira se copiou a chave certa.`);
+            } else {
+                appendSystemMessage(`🔑 ${nome} configurado nesta sessão (modelo: ${escapeHtml(modelo)}).`);
+            }
         }
 
         function getAgentsForModule() {
@@ -586,24 +659,66 @@
             return blocks;
         }
 
-        async function callClaude({ system, content, maxTokens = MAX_TOKENS }) {
-            const headers = {
-                "Content-Type": "application/json",
-                "anthropic-version": "2023-06-01",
-                "anthropic-dangerous-direct-browser-access": "true"
-            };
-            if (state.apiKey) headers["x-api-key"] = state.apiKey;
-            const res = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: "user", content }] })
+        function toOpenAIParts(blocks) {
+            return blocks.map(b => {
+                if (b.type === "text") return { type: "text", text: b.text };
+                if (b.type === "image") return { type: "image_url", image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } };
+                if (b.type === "document") return { type: "file", file: { filename: "documento.pdf", file_data: `data:application/pdf;base64,${b.source.data}` } };
+                return { type: "text", text: "" };
             });
+        }
+
+        function toGeminiParts(blocks) {
+            return blocks.map(b => {
+                if (b.type === "text") return { text: b.text };
+                if (b.type === "image" || b.type === "document") return { inline_data: { mime_type: b.source.media_type, data: b.source.data } };
+                return { text: "" };
+            });
+        }
+
+        async function callAI({ system, content, maxTokens = MAX_TOKENS }) {
+            const p = state.provider;
+            const cfg = state.keys[p];
+            const key = cfg.key;
+            const model = cfg.model || PROVIDERS[p].defaultModel;
+            if (!key && p !== "anthropic") throw new Error(`informe a chave de ${PROVIDERS[p].label} no botão IA`);
+
+            let url, headers, body, extract;
+            if (p === "anthropic") {
+                url = "https://api.anthropic.com/v1/messages";
+                headers = { "Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+                if (key) headers["x-api-key"] = key;
+                body = { model, max_tokens: maxTokens, system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content }] };
+                extract = d => d.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+            } else if (p === "openai") {
+                url = "https://api.openai.com/v1/chat/completions";
+                headers = { "Content-Type": "application/json", "Authorization": `Bearer ${key}` };
+                body = {
+                    model,
+                    max_completion_tokens: maxTokens,
+                    response_format: { type: "json_object" },
+                    messages: [{ role: "system", content: system }, { role: "user", content: toOpenAIParts(content) }]
+                };
+                extract = d => d.choices[0].message.content;
+            } else {
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+                headers = { "Content-Type": "application/json", "x-goog-api-key": key };
+                body = {
+                    systemInstruction: { parts: [{ text: system }] },
+                    contents: [{ role: "user", parts: toGeminiParts(content) }],
+                    generationConfig: { maxOutputTokens: maxTokens, responseMimeType: "application/json" }
+                };
+                extract = d => (d.candidates?.[0]?.content?.parts || []).map(x => x.text || "").join("");
+            }
+
+            const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
             if (!res.ok) {
                 const detalhe = (await res.text()).slice(0, 200);
-                throw new Error(`Erro ${res.status}. ${detalhe}`);
+                if (res.status === 401 || res.status === 403) throw new Error(`chave inválida ou sem permissão em ${PROVIDERS[p].label}. Confira a chave no botão IA.`);
+                if (res.status === 429) throw new Error(`limite de uso ou cota esgotada em ${PROVIDERS[p].label}`);
+                throw new Error(`Erro ${res.status} em ${PROVIDERS[p].label}. ${detalhe}`);
             }
-            const data = await res.json();
-            return data.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+            return extract(await res.json());
         }
 
         function parseAIJson(text) {
@@ -634,8 +749,8 @@ ${instruction}
 
 Devolva SOMENTE um JSON neste formato:
 {"fala": "sua contribuição, até 90 palavras, sem repetir o que já foi dito", "memoria": "resumo atualizado, até 120 palavras, do que você aprendeu com o Dono, as diretrizes e os documentos"}`;
-            const raw = await callClaude({
-                system: sharedSystemBlocks(),
+            const raw = await callAI({
+                system: buildSharedSystem(),
                 content: [...buildDocBlocks(), { type: "text", text }]
             });
             return parseAIJson(raw);
@@ -1125,8 +1240,8 @@ Devolva SOMENTE um JSON neste formato:
             setThinkingUI(true, "Consolidando o parecer final com base em todas as falas e documentos...");
             try {
                 const text = `TRANSCRIÇÃO COMPLETA DA REUNIÃO:\n${transcriptText()}\n\nTAREFA: Você é o consolidador. Produza o PARECER FINAL: síntese das melhores ideias, pontos de divergência, recomendação prática e próximos passos, citando o que está nos documentos. Devolva SOMENTE um JSON: {"parecer": "texto do parecer, até 250 palavras", "consenso": número de 0 a 100 indicando o alinhamento real entre as IAs, "proximos_passos": "lista curta em texto"}`;
-                const raw = await callClaude({
-                    system: sharedSystemBlocks(),
+                const raw = await callAI({
+                    system: buildSharedSystem(),
                     content: [...buildDocBlocks(), { type: "text", text }],
                     maxTokens: 1500
                 });
