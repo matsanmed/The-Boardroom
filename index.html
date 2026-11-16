@@ -564,7 +564,7 @@
         const PROVIDERS = {
             anthropic: { label: "Anthropic (Claude)", short: "Claude", defaultModel: "claude-sonnet-4-6", keyHint: "sk-ant-...", keyUrl: "console.anthropic.com", keyPrefix: "sk-ant-" },
             openai: { label: "OpenAI (ChatGPT)", short: "ChatGPT", defaultModel: "gpt-4o", keyHint: "sk-...", keyUrl: "platform.openai.com/api-keys", keyPrefix: "sk-" },
-            google: { label: "Google (Gemini)", short: "Gemini", defaultModel: "gemini-3.8-flash", keyHint: "Cole sua chave do Gemini", keyUrl: "aistudio.google.com/apikey", keyPrefix: null }
+            google: { label: "Google (Gemini)", short: "Gemini", defaultModel: "gemini-3.1-pro-preview", keyHint: "Cole sua chave do Gemini", keyUrl: "aistudio.google.com/apikey", keyPrefix: null }
         };
         state.provider = "anthropic";
         state.editingProvider = "anthropic";
@@ -676,6 +676,30 @@
             });
         }
 
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // Tenta de novo quando o provedor responde "muitas requisições" (429) ou indisponível (503)
+        async function fetchWithRetry(url, opts) {
+            for (let tentativa = 1; ; tentativa++) {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 90000);
+                let res;
+                try {
+                    res = await fetch(url, { ...opts, signal: ctrl.signal });
+                } catch (e) {
+                    clearTimeout(timer);
+                    if (e.name === "AbortError") throw new Error("sem resposta do provedor após 90 segundos");
+                    throw new Error(`falha de conexão (${e.message}). Verifique a internet ou bloqueadores do navegador`);
+                }
+                clearTimeout(timer);
+                if ((res.status === 429 || res.status === 503) && tentativa < 4) {
+                    await sleep(15000 * tentativa);
+                    continue;
+                }
+                return res;
+            }
+        }
+
         async function callAI({ system, content, maxTokens = MAX_TOKENS }) {
             const p = state.provider;
             const cfg = state.keys[p];
@@ -706,33 +730,25 @@
                 body = {
                     systemInstruction: { parts: [{ text: system }] },
                     contents: [{ role: "user", parts: toGeminiParts(content) }],
-                    generationConfig: { maxOutputTokens: maxTokens, responseMimeType: "application/json" }
+                    generationConfig: {
+                        maxOutputTokens: Math.max(maxTokens, 6000),
+                        responseMimeType: "application/json",
+                        thinkingConfig: { thinkingLevel: "medium" }
+                    }
                 };
                 extract = d => (d.candidates?.[0]?.content?.parts || []).map(x => x.text || "").join("");
             }
 
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 90000);
-            try {
-                let res;
-                try {
-                    res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: ctrl.signal });
-                } catch (e) {
-                    if (e.name === "AbortError") throw new Error(`sem resposta de ${PROVIDERS[p].label} após 90 segundos`);
-                    throw new Error(`falha de conexão com ${PROVIDERS[p].label} (${e.message}). Verifique a internet ou bloqueio do navegador`);
-                }
-                if (!res.ok) {
-                    const detalhe = (await res.text()).slice(0, 200);
-                    if (res.status === 401 || res.status === 403) throw new Error(`chave inválida ou sem permissão em ${PROVIDERS[p].label}. Confira a chave no botão IA.`);
-                    if (res.status === 429) throw new Error(`limite de uso ou cota esgotada em ${PROVIDERS[p].label}`);
-                    throw new Error(`Erro ${res.status} em ${PROVIDERS[p].label}. ${detalhe}`);
-                }
-                const texto = extract(await res.json());
-                if (!texto || !texto.trim()) throw new Error(`${PROVIDERS[p].label} respondeu vazio (tokens esgotados ou modelo sem saída)`);
-                return texto;
-            } finally {
-                clearTimeout(timer);
+            const res = await fetchWithRetry(url, { method: "POST", headers, body: JSON.stringify(body) });
+            if (!res.ok) {
+                const detalhe = (await res.text()).slice(0, 300);
+                if (res.status === 401 || res.status === 403) throw new Error(`chave inválida ou sem permissão em ${PROVIDERS[p].label}. Confira a chave no botão IA.`);
+                if (res.status === 429) throw new Error(`cota ou limite de uso de ${PROVIDERS[p].label} esgotado, mesmo após novas tentativas. Confira o plano e a cota no painel do provedor. Detalhe: ${detalhe}`);
+                throw new Error(`Erro ${res.status} em ${PROVIDERS[p].label}. ${detalhe}`);
             }
+            const texto = extract(await res.json());
+            if (!texto || !texto.trim()) throw new Error(`${PROVIDERS[p].label} respondeu vazio`);
+            return texto;
         }
 
         function parseAIJson(text) {
@@ -1222,15 +1238,17 @@ Devolva SOMENTE um JSON neste formato:
             const instruction = `Rodada ${state.round} da reunião sobre: "${state.topic}". Considere a última fala do Dono e os documentos anexados. Traga uma contribuição concreta e diferente das que já foram ditas, ou discorde de algo com argumentos.`;
             const falhas = [];
             try {
-                let concluidos = 0;
-                const results = await Promise.allSettled(team.map(async ag => {
+                const results = [];
+                for (let i = 0; i < team.length; i++) {
+                    const ag = team[i];
+                    setThinkingUI(true, `${i + 1}/${team.length} — ${ag.name} está pensando...`);
                     try {
-                        return { ag, r: await askAgent(ag, instruction) };
-                    } finally {
-                        concluidos++;
-                        setThinkingUI(true, `${concluidos}/${team.length} funcionários responderam...`);
+                        results.push({ status: "fulfilled", value: { ag, r: await askAgent(ag, instruction) } });
+                    } catch (reason) {
+                        results.push({ status: "rejected", reason });
                     }
-                }));
+                    if (i < team.length - 1) await sleep(3000);
+                }
                 results.forEach(res => {
                     if (res.status === "rejected") {
                         falhas.push(res.reason?.message || String(res.reason));
