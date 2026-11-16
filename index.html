@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conselho Supremo de IAs — Empresa, Social & Brainstorming</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+        .selectable-text {
+            user-select: text;
+        }
+        body {
+            background-color: #070b14;
+            color: #f1f5f9;
+            overflow: hidden;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 28px rgba(245, 158, 11, 0.85); }
+        }
+        .ceo-glow {
+            animation: pulseGlow 2.6s infinite;
+        }
+        @keyframes fadeInSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .msg-anim {
+            animation: fadeInSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes heartPop {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.35); }
+            100% { transform: scale(1); }
+        }
+        .heart-pop {
+            animation: heartPop 0.35s ease-out;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col lg:flex-row overflow-hidden bg-slate-950">
+
+    <!-- MODAL DE UPLOAD DE ARQUIVOS (DISPONÍVEL EM AMBOS OS MODOS) -->
+    <div id="fileUploadModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                        <i class="ph-fill ph-file-arrow-up text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Central de Documentos & Arquivos</h3>
+                        <p class="text-xs text-slate-400">Envie PDFs, planilhas CSV/Excel ou fotos para os agentes lerem e se embasarem.</p>
+                    </div>
+                </div>
+                <button onclick="closeFileUploadModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Área de Arrastar e Soltar / Selecionar Arquivo -->
+            <div class="border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-2xl p-6 text-center bg-slate-950/60 transition cursor-pointer relative" onclick="document.getElementById('fileInputReal').click()">
+                <input type="file" id="fileInputReal" multiple accept=".pdf,.csv,.xlsx,.xls,.txt,.png,.jpg,.jpeg" class="hidden" onchange="handleFilesSelected(this.files)">
+                <i class="ph-duotone ph-cloud-arrow-up text-4xl text-cyan-400 mb-2"></i>
+                <p class="text-xs font-bold text-white">Clique para selecionar arquivos ou arraste aqui</p>
+                <p class="text-[11px] text-slate-400 mt-1">Suporta PDFs de Contratos, Planilhas de Contas Médicas, Imagens de Prontuários e CSVs</p>
+            </div>
+
+            <!-- Lista de Arquivos Já Carregados -->
+            <div class="space-y-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">Arquivos Disponíveis para os Agentes (<span id="uploadCountLabel">0</span>)</span>
+                <div id="uploadedFilesList" class="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button onclick="closeFileUploadModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-lg transition">
+                    Concluir & Usar no Debate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÁREA ESQUERDA/CENTRO: SEDE ISOMÉTRICA OU MÓDULO DE AUDITORIA TÉCNICA -->
+    <div class="relative flex-1 lg:w-[63%] h-[53%] lg:h-full bg-[#070b14] overflow-hidden flex flex-col">
+        
+        <!-- HUD SUPERIOR: ALTERNÂNCIA DE MÓDULOS + STATUS + UPLOAD -->
+        <div class="absolute top-3 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <!-- Seletor de Módulo (Botão de Alternância no Topo) -->
+                <div class="pointer-events-auto flex items-center bg-slate-900/95 backdrop-blur-md border border-slate-700/80 p-1 rounded-2xl shadow-2xl">
+                    <button onclick="switchAppModule('GENERAL')" id="modBtnGeneral" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-amber-500 text-slate-950 shadow">
+                        <i class="ph-fill ph-buildings text-base"></i>
+                        <span>Conselho Geral</span>
+                    </button>
+                    <button onclick="switchAppModule('AUDIT')" id="modBtnAudit" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition text-slate-300 hover:text-white">
+                        <i class="ph-fill ph-stethoscope text-base"></i>
+                        <span>Auditoria de Contas Médicas</span>
+                    </button>
+                </div>
+
+                <!-- Botão de Upload de Arquivos e Menu Rápido -->
+                <div class="pointer-events-auto flex items-center gap-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 p-1.5 rounded-2xl shadow-2xl">
+                    <button onclick="openFileUploadModal()" class="px-3 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
+                        <i class="ph-fill ph-paperclip text-base text-cyan-400"></i>
+                        <span>Arquivos (<span id="fileCountBadge">0</span>)</span>
+                    </button>
+                    <div class="h-4 w-[1px] bg-slate-700 mx-0.5"></div>
+                    <button onclick="openAISettings()" title="Chave da API (opcional)" class="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
+                        <i class="ph-fill ph-cpu text-base text-emerald-400"></i>
+                        <span>IA</span>
+                    </button>
+                    <div class="h-4 w-[1px] bg-slate-700 mx-0.5"></div>
+                    <button onclick="openRolesModal()" title="Cargos e Personalidades" class="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
+                        <i class="ph-fill ph-user-gear text-base text-amber-400"></i>
+                        <span>Cargos & Personalidade</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Barra Secundária (Cômodos no Geral ou Abas no Módulo de Auditoria) -->
+            <div id="subNavBarGeneral" class="pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-0.5 max-w-full">
+                <button onclick="focusRoom('ALL')" class="shrink-0 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-[11px] font-semibold flex items-center gap-1 shadow">
+                    <i class="ph-fill ph-buildings text-amber-400"></i> Visão Geral
+                </button>
+                <button onclick="focusRoom('GAME_ROOM')" class="shrink-0 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-purple-300 border border-purple-500/30 text-[11px] font-semibold flex items-center gap-1 shadow">
+                    <i class="ph-fill ph-game-controller"></i> Sala de TV & Games
+                </button>
+                <button onclick="focusRoom('KITCHEN')" class="shrink-0 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-200 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 shadow">
+                    <i class="ph-fill ph-coffee"></i> Cozinha & Café
+                </button>
+                <button onclick="focusRoom('CHAT_LOUNGE')" class="shrink-0 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 text-[11px] font-semibold flex items-center gap-1 shadow">
+                    <i class="ph-fill ph-chats-circle"></i> Mesas de Conversa
+                </button>
+                <button onclick="focusRoom('BOARDROOM')" class="shrink-0 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1 shadow">
+                    <i class="ph-fill ph-users-three"></i> Sala de Reunião
+                </button>
+            </div>
+
+            <div id="subNavBarAudit" class="hidden pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-0.5 max-w-full">
+                <span class="px-2.5 py-1 rounded-xl bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center gap-1">
+                    <i class="ph-fill ph-stethoscope"></i> Equipe: 5 Enfermeiras & 5 Faturistas
+                </span>
+                <button onclick="openKnowledgeBaseModal()" class="px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/40 text-[11px] font-semibold flex items-center gap-1 shadow">
+                    <i class="ph-fill ph-brain"></i> Base de Conhecimento & Padrões do Dono
+                </button>
+            </div>
+        </div>
+
+        <!-- FICHA COMPLETA DO BONECO AO CLICAR (COM EDITAR PERSONALIDADE E CARGO) -->
+        <div id="agentInspector" class="hidden absolute top-28 left-3 z-30 w-[330px] sm:w-[385px] max-h-[calc(100%-190px)] flex flex-col bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-3xl shadow-2xl overflow-hidden transition-all">
+            <div class="p-3.5 bg-slate-950/90 border-b border-slate-800 flex items-start justify-between gap-2">
+                <div class="flex items-center gap-2.5">
+                    <div id="inspColor" class="w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold text-white shadow-inner text-sm shrink-0"></div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h4 id="inspName" class="font-extrabold text-white text-sm"></h4>
+                            <span id="inspPromoBadge" class="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30"></span>
+                        </div>
+                        <p id="inspRole" class="text-[11px] font-semibold text-amber-400 mt-0.5"></p>
+                        <p id="inspState" class="text-[10px] text-emerald-400 font-medium mt-0.5"></p>
+                    </div>
+                </div>
+                <button onclick="closeInspector()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+
+            <div class="p-3.5 overflow-y-auto space-y-3 text-xs">
+                <!-- Personalidade Customizada do Agente (Ex: Pessoa do Contra, Relativista, etc.) -->
+                <div class="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1">
+                            <i class="ph-fill ph-user-gear"></i> Personalidade & Comportamento
+                        </span>
+                        <span class="text-[10px] text-slate-500">Editável a qualquer momento</span>
+                    </div>
+                    <textarea 
+                        id="inspPersonalityInput" 
+                        rows="2" 
+                        placeholder="Ex: Pessoa do contra (questiona tudo com rigor), relativista (avalia o contexto sem burocracia cega)..."
+                        onchange="updateAgentPersonalityFromInspector(this.value)"
+                        class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl p-2 text-xs text-white placeholder-slate-500 focus:outline-none selectable-text"
+                    ></textarea>
+                </div>
+
+                <!-- Medidor de Corações (Gostei) & Chance de Promoção -->
+                <div id="inspHeartSection" class="bg-slate-950/90 border border-rose-500/30 rounded-2xl p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold tracking-wider text-rose-300 flex items-center gap-1">
+                                <i class="ph-fill ph-heart text-rose-500"></i> Aprovação do Dono
+                            </span>
+                            <div class="flex items-baseline gap-2 mt-0.5">
+                                <span id="inspLikesCount" class="text-base font-extrabold text-white font-mono">0 ❤️</span>
+                                <span id="inspPromoStatus" class="text-[11px] text-slate-400">Candidato Inicial</span>
+                            </div>
+                        </div>
+                        <button onclick="giveHeartToSelectedAgent()" class="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg active:scale-95 transition">
+                            <i class="ph-fill ph-heart text-sm"></i>
+                            <span>Dar Gostei</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notícias Recentes & Acontecimentos -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2">
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1">
+                        <i class="ph-fill ph-newspaper"></i> Histórico & Atividades
+                    </span>
+                    <div id="inspNewsFeed" class="space-y-1.5 max-h-28 overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CANVAS ISOMÉTRICO (COMPATÍVEL COM AMBOS OS MÓDULOS) -->
+        <canvas id="officeCanvas" class="w-full h-full cursor-grab active:cursor-grabbing block"></canvas>
+    </div>
+
+    <!-- ÁREA DIREITA: DEBATE, PAINEL DE AUDITORIA E LEI DO DONO -->
+    <div class="w-full lg:w-[37%] h-[47%] lg:h-full bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col z-30">
+        
+        <div class="p-3.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+                <div id="rightPanelIconBox" class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                    <i class="ph-fill ph-crown text-xl" id="rightPanelIcon"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 id="rightPanelTitle" class="text-sm font-bold text-white tracking-tight">Conselho Supremo de IAs</h2>
+                        <span id="rightPanelBadge" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">Você é a Lei</span>
+                    </div>
+                    <p id="currentTopicHeader" class="text-[11px] text-slate-400 truncate max-w-[230px] sm:max-w-[290px]">Reúna o grupo e dê ❤️ nas melhores ideias!</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-end min-w-[90px]">
+                <div class="flex items-center gap-1 text-[11px] font-semibold text-slate-300">
+                    <span>Consenso:</span>
+                    <span id="consensusValue" class="text-emerald-400 font-mono">0%</span>
+                </div>
+                <div class="w-20 h-2 bg-slate-800 rounded-full overflow-hidden mt-1 border border-slate-700">
+                    <div id="consensusBar" class="h-full bg-gradient-to-r from-amber-500 to-emerald-400 transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="activeAgendaBanner" class="hidden bg-slate-900/95 border-b border-slate-800 px-4 py-2.5 text-xs">
+            <div class="flex items-start justify-between gap-2">
+                <div class="selectable-text">
+                    <span id="agendaBannerLabel" class="font-bold text-amber-400 uppercase tracking-wider text-[10px]">Tema na Mesa:</span>
+                    <p id="agendaTextDisplay" class="text-slate-200 font-semibold mt-0.5"></p>
+                </div>
+                <button onclick="openSummonModal()" title="Mudar Tema" class="text-slate-400 hover:text-amber-400 p-1 shrink-0">
+                    <i class="ph ph-pencil-simple"></i>
+                </button>
+            </div>
+            <div id="ownerLawBox" class="hidden mt-2 pt-1.5 border-t border-amber-500/20 flex items-start gap-1.5 text-amber-300">
+                <i class="ph-fill ph-gavel text-sm shrink-0 mt-0.5"></i>
+                <div class="text-[11px] selectable-text">
+                    <strong class="uppercase">Diretriz do Dono:</strong>
+                    <span id="ownerLawText"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTÓRICO DE MENSAGENS -->
+        <div id="chatContainer" class="flex-1 overflow-y-auto p-3.5 space-y-3 selectable-text">
+            <div id="emptyStatePanel" class="h-full flex flex-col items-center justify-center text-center px-3 py-4">
+                <div class="w-12 h-12 rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-amber-400 mb-2.5 shadow-inner">
+                    <i class="ph-duotone ph-buildings text-2xl" id="emptyStateIcon"></i>
+                </div>
+                <h3 id="emptyStateTitle" class="text-sm font-bold text-white">Sua Empresa Está Viva!</h3>
+                <p id="emptyStateDesc" class="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+                    Os 10 agentes começam sem cargo fixo. Use o botão no topo para alternar para o <strong class="text-cyan-400">Módulo de Auditoria Médica</strong> quando quiser!
+                </p>
+                <div class="mt-3.5 flex flex-wrap justify-center gap-1.5">
+                    <button onclick="quickStartTopic('Como otimizar nossos processos e resolver gargalos criativamente?')" class="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold px-3 py-1.5 rounded-xl border border-amber-500/40 transition">
+                        🚀 Iniciar Reunião Geral
+                    </button>
+                    <button onclick="switchAppModule('AUDIT'); quickStartTopic('Auditar lote de contas médicas com divergência de TUSS e glosas de OPME.')" class="text-[11px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-semibold px-3 py-1.5 rounded-xl border border-cyan-500/40 transition">
+                        🏥 Ir para Auditoria Médica
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="aiThinkingIndicator" class="hidden px-4 py-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-xs text-amber-300">
+            <div class="flex items-center gap-2">
+                <i class="ph ph-spinner animate-spin text-base"></i>
+                <span id="thinkingText">A equipe está analisando os dados...</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-500">IA TEAM</span>
+        </div>
+
+        <!-- CONTROLES INFERIORES -->
+        <div class="p-3 bg-slate-950 border-t border-slate-800 space-y-2">
+            <div id="meetingActionButtons" class="hidden grid grid-cols-3 gap-1.5">
+                <button id="btnNextRound" onclick="triggerNextRound()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1 transition shadow">
+                    <i class="ph-bold ph-arrows-clockwise"></i>
+                    <span>Nova Rodada</span>
+                </button>
+                <button id="btnForceConsensus" onclick="triggerConsensusSynthesis()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1 transition shadow">
+                    <i class="ph-bold ph-handshake"></i>
+                    <span>Consenso Final</span>
+                </button>
+                <button onclick="endMeeting()" class="bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-300 font-medium py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1 transition border border-slate-700">
+                    <i class="ph ph-door-open"></i>
+                    <span>Liberar Sala</span>
+                </button>
+            </div>
+
+            <div class="relative flex items-center gap-2">
+                <div class="relative flex-1">
+                    <input 
+                        id="ownerCommandInput" 
+                        type="text" 
+                        placeholder="Digite sua ordem, tema ou caso de auditoria médica..." 
+                        class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl pl-3.5 pr-9 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition selectable-text"
+                        onkeydown="if(event.key === 'Enter') handleOwnerCommandSubmit()"
+                    >
+                    <i class="ph-fill ph-gavel absolute right-3 top-1/2 -translate-y-1/2 text-amber-500/60"></i>
+                </div>
+                <button 
+                    onclick="handleOwnerCommandSubmit()" 
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shrink-0 transition shadow-lg">
+                    <span>Enviar</span>
+                    <i class="ph-bold ph-paper-plane-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE BASE DE CONHECIMENTO & PADRÕES DO DONO -->
+    <div id="knowledgeBaseModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                        <i class="ph-fill ph-brain text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Base de Conhecimento & Padrões do Dono</h3>
+                        <p class="text-xs text-slate-400">Ensine padrões de e-mails, respostas de glosas e diretrizes que a equipe aprende e segue rigorosamente.</p>
+                    </div>
+                </div>
+                <button onclick="closeKnowledgeBaseModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-bold uppercase tracking-wider text-amber-400 block mb-1">Diretrizes e Padrões de Resposta da Auditoria</label>
+                    <textarea 
+                        id="kbStandardsInput" 
+                        rows="5" 
+                        placeholder="Ex: 1. Em glosas de OPME, sempre verificar se houve justificativa médica prévia antes de acatar. 2. Padrão de e-mail para operadoras: ser cordial, objetivo, citar a cláusula contratual e anexar evidências..."
+                        class="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-2xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none selectable-text"
+                    ></textarea>
+                </div>
+                <p class="text-[11px] text-slate-400">💡 Sempre que você atualizar esta base, as 5 enfermeiras e os 5 faturistas absorverão seus ensinamentos em tempo real durante as análises.</p>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button onclick="closeKnowledgeBaseModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-6 py-2.5 rounded-xl text-xs shadow-lg transition">
+                    Salvar e Ensinar Equipe
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CARGOS E PERSONALIDADES -->
+    <div id="rolesModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                        <i class="ph-fill ph-user-gear text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Gestão Livre de Cargos & Personalidades</h3>
+                        <p class="text-xs text-slate-400">Defina nomes, cargos e comportamentos customizados (ex: 'pessoa do contra', 'relativista') a qualquer momento.</p>
+                    </div>
+                </div>
+                <button onclick="closeRolesModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <div id="rolesListContainer" class="flex-1 overflow-y-auto p-5 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+
+            <div class="p-4 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between">
+                <span class="text-xs text-slate-400">Você também pode definir cargos conversando no chat (ex: "Nomeio a Ana como Enfermeira Chefe e o Carlos como Faturista Relativista").</span>
+                <button onclick="closeRolesModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg transition">
+                    Salvar e Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURAÇÃO DA IA -->
+    <div id="aiSettingsModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white">Inteligência Artificial dos Funcionários</h3>
+                <button onclick="closeAISettings()" class="text-slate-400 hover:text-white p-1.5 rounded-lg"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">Cada funcionário é uma IA (Claude) que lê as suas falas, as diretrizes e os documentos anexados, e responde com base neles. Dentro do Claude não precisa de chave. Se abrir este arquivo no seu computador, cole abaixo a sua chave da API Anthropic.</p>
+            <div class="space-y-1">
+                <label class="text-xs font-bold uppercase tracking-wider text-emerald-300 block">Chave da API Anthropic (opcional)</label>
+                <input id="apiKeyInput" type="password" placeholder="sk-ant-..." class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none selectable-text">
+                <p class="text-[11px] text-slate-500">A chave fica só nesta sessão e não é salva em lugar nenhum.</p>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeAISettings()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-lg transition">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /********************************************************************
+         * ESTADO GLOBAL E CONFIGURAÇÃO DOS DOIS MÓDULOS
+         ********************************************************************/
+        const apiKey = "";
+        const STORAGE_KEY_AGENTS = "conselho_supremo_ia_agents_v4";
+
+        const state = {
+            activeModule: "GENERAL", // "GENERAL" | "AUDIT"
+            uploadedFiles: [], // Armazena arquivos enviados pelo usuário
+            knowledgeBaseStandards: "Diretriz padrão: Analisar contas médicas com rigor técnico, cruzando regras TUSS, CBHPM e contratos de operadoras.",
+            mode: "ROUTINE",
+            topic: "",
+            ownerLaws: [],
+            round: 0,
+            consensus: 0,
+            simSpeed: 1,
+            isGeneratingAI: false,
+            selectedAgentId: null,
+            debateHistory: [],
+            floatingHearts: [],
+            socialTimer: 160,
+            camera: { x: 20, y: 50, zoom: 0.86, isDragging: false, dragStartX: 0, dragStartY: 0 }
+        };
+
+        // 10 Agentes do Módulo Geral
+        const GENERAL_AGENTS_DATA = [
+            { id: "g1", name: "Lucas", color: "#3b82f6", hairColor: "#1e293b", skinColor: "#f1c27d", hairStyle: "short", seatIndex: 0 },
+            { id: "g2", name: "Marina", color: "#a855f7", hairColor: "#581c87", skinColor: "#ffdbac", hairStyle: "long", seatIndex: 1 },
+            { id: "g3", name: "Rafael", color: "#06b6d4", hairColor: "#0f172a", skinColor: "#e0ac69", hairStyle: "glasses", seatIndex: 2 },
+            { id: "g4", name: "Clara", color: "#ec4899", hairColor: "#be185d", skinColor: "#ffdbac", hairStyle: "bun", seatIndex: 3 },
+            { id: "g5", name: "Bruno", color: "#ef4444", hairColor: "#18181b", skinColor: "#f1c27d", hairStyle: "spiky", seatIndex: 4 },
+            { id: "g6", name: "Helena", color: "#14b8a6", hairColor: "#78350f", skinColor: "#e0ac69", hairStyle: "long", seatIndex: 5 },
+            { id: "g7", name: "Gabriel", color: "#6366f1", hairColor: "#cbd5e1", skinColor: "#c68642", hairStyle: "short", seatIndex: 6 },
+            { id: "g8", name: "Camila", color: "#f97316", hairColor: "#451a03", skinColor: "#f1c27d", hairStyle: "bun", seatIndex: 7 },
+            { id: "g9", name: "Daniel", color: "#eab308", hairColor: "#94a3b8", skinColor: "#ffdbac", hairStyle: "beard", seatIndex: 8 },
+            { id: "g10", name: "Beatriz", color: "#10b981", hairColor: "#065f46", skinColor: "#e0ac69", hairStyle: "long", seatIndex: 9 }
+        ];
+
+        // 10 Agentes do Módulo de Auditoria Médica (5 Enfermeiras Auditoras + 5 Faturistas)
+        const AUDIT_AGENTS_DATA = [
+            // 5 Enfermeiras Auditoras
+            { id: "a1", name: "Enf. Ana Costa", role: "Enfermeira Chefe", personality: "Rigorosa com prontuários e justificativas de UTI.", color: "#06b6d4", hairColor: "#0f172a", skinColor: "#ffdbac", hairStyle: "bun", seatIndex: 0, isNurse: true },
+            { id: "a2", name: "Enf. Beatriz Lima", role: "Auditora Concorrente", personality: "Relativista, avalia o contexto clínico antes de apontar glosa.", color: "#3b82f6", hairColor: "#1e293b", skinColor: "#e0ac69", hairStyle: "long", seatIndex: 1, isNurse: true },
+            { id: "a3", name: "Enf. Carla Souza", role: "Auditoria de OPME", personality: "Pessoa do contra, questiona todas as solicitações de materiais especiais.", color: "#6366f1", hairColor: "#581c87", skinColor: "#f1c27d", hairStyle: "glasses", seatIndex: 2, isNurse: true },
+            { id: "a4", name: "Enf. Daniela Dias", role: "Glosa Hospitalar", personality: "Analítica e direta, focada em evitar perdas de receita.", color: "#14b8a6", hairColor: "#78350f", skinColor: "#ffdbac", hairStyle: "short", seatIndex: 3, isNurse: true },
+            { id: "a5", name: "Enf. Elisa Mendes", role: "Qualidade Assistencial", personality: "Busca sempre o consenso entre segurança do paciente e diretriz da operadora.", color: "#10b981", hairColor: "#065f46", skinColor: "#e0ac69", hairStyle: "bun", seatIndex: 4, isNurse: true },
+            // 5 Faturistas
+            { id: "a6", name: "Fernando Rocha", role: "Faturista Sênior", personality: "Especialista em tabelas TUSS e CBHPM.", color: "#f59e0b", hairColor: "#451a03", skinColor: "#f1c27d", hairStyle: "short", seatIndex: 5, isNurse: false },
+            { id: "a7", name: "Gustavo Alves", role: "Recursos de Glosa", personality: "Pessoa do contra, não aceita glosa indevida sem defesa técnica robusta.", color: "#ef4444", hairColor: "#18181b", skinColor: "#e0ac69", hairStyle: "beard", seatIndex: 6, isNurse: false },
+            { id: "a8", name: "Hugo Martins", role: "Conferência de Lotes", personality: "Mapeia divergências de XML e guias TISS com precisão cirúrgica.", color: "#f97316", hairColor: "#cbd5e1", skinColor: "#ffdbac", hairStyle: "spiky", seatIndex: 7, isNurse: false },
+            { id: "a9", name: "Juliana Ramos", role: "Faturamento Ambu/Hosp", personality: "Relativista, flexível na negociação com convênios quando há margem.", color: "#ec4899", hairColor: "#be185d", skinColor: "#c68642", hairStyle: "long", seatIndex: 8, isNurse: false },
+            { id: "a10", name: "Igor Farias", role: "Auditor de Contas", personality: "Focado em prazos de envio e conformidade contratual.", color: "#8b5cf6", hairColor: "#2e1065", skinColor: "#f1c27d", hairStyle: "glasses", seatIndex: 9, isNurse: false }
+        ];
+
+        let agentsGeneral = [];
+        let agentsAudit = [];
+        let agents = []; // Aponta para o conjunto ativo atual
+
+        /********************************************************************
+         * GERENCIAMENTO DE ARQUIVOS (UPLOAD)
+         ********************************************************************/
+        function openFileUploadModal() {
+            document.getElementById("fileUploadModal").classList.remove("hidden");
+            renderUploadedFilesList();
+        }
+
+        function closeFileUploadModal() {
+            document.getElementById("fileUploadModal").classList.add("hidden");
+        }
+
+        // Função para focar a câmera em cômodos específicos
+        function focusRoom(roomName) {
+            if (roomName === 'ALL') {
+                state.camera.x = 20;
+                state.camera.y = 50;
+                state.camera.zoom = 0.86;
+            } else if (roomName === 'GAME_ROOM') {
+                state.camera.x = 100;
+                state.camera.y = 40;
+                state.camera.zoom = 1.1;
+            } else if (roomName === 'KITCHEN') {
+                state.camera.x = 20;
+                state.camera.y = 80;
+                state.camera.zoom = 1.1;
+            } else if (roomName === 'CHAT_LOUNGE') {
+                state.camera.x = -40;
+                state.camera.y = 40;
+                state.camera.zoom = 1.1;
+            } else if (roomName === 'BOARDROOM') {
+                state.camera.x = 20;
+                state.camera.y = 10;
+                state.camera.zoom = 1.2;
+            }
+        }
+
+        /********************************************************************
+         * INTEGRAÇÃO REAL COM IA (CLAUDE API)
+         ********************************************************************/
+        const MODEL = "claude-sonnet-4-6"; // troque aqui se quiser outro modelo
+        const MAX_TOKENS = 1000;
+        state.apiKey = "";
+        state.transcript = [];
+
+        function openAISettings() {
+            document.getElementById("apiKeyInput").value = state.apiKey;
+            document.getElementById("aiSettingsModal").classList.remove("hidden");
+        }
+
+        function closeAISettings() {
+            state.apiKey = document.getElementById("apiKeyInput").value.trim();
+            document.getElementById("aiSettingsModal").classList.add("hidden");
+            appendSystemMessage(state.apiKey
+                ? "🔑 Chave de API salva nesta sessão."
+                : "🔑 Sem chave: as IAs só respondem se este arquivo estiver rodando dentro do Claude.");
+        }
+
+        function getAgentsForModule() {
+            return (state.activeModule === "AUDIT" ? agentsAudit : agentsGeneral).filter(a => !a.isCEO);
+        }
+
+        function buildSharedSystem() {
+            const base = state.activeModule === "AUDIT"
+                ? "Você faz parte de uma equipe de IAs que trabalha no módulo de auditoria de contas médicas: 5 enfermeiras auditoras e 5 faturistas. Aplique rigorosamente as diretrizes e padrões do Dono (base de conhecimento), cruzando regras TUSS, CBHPM, contratos de operadoras, prontuários e lotes anexados. Nunca invente valores, códigos ou prazos: se a informação não estiver nos documentos, diga que falta."
+                : "Você faz parte de uma equipe de IAs funcionárias de uma empresa. O Dono é a autoridade máxima: suas falas e diretrizes são lei. Cada IA tem opinião própria, raciocínio rigoroso e fala de forma concisa, baseando-se nos documentos anexados.";
+            const laws = state.ownerLaws.length
+                ? state.ownerLaws.map((l, i) => `${i + 1}. ${l}`).join("\n")
+                : "(Nenhuma fala do Dono ainda.)";
+            const kb = state.activeModule === "AUDIT"
+                ? `\n\nBASE DE CONHECIMENTO E PADRÕES DO DONO:\n${state.knowledgeBaseStandards}`
+                : "";
+            return `${base}\n\nFALAS E DIRETRIZES DO DONO (siga sempre):\n${laws}${kb}\n\nResponda em português do Brasil e devolva apenas o JSON pedido.`;
+        }
+
+        function sharedSystemBlocks() {
+            return [{ type: "text", text: buildSharedSystem(), cache_control: { type: "ephemeral" } }];
+        }
+
+        function buildDocBlocks() {
+            const blocks = state.uploadedFiles.flatMap(f => f.blocks || []);
+            if (blocks.length) {
+                blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: "ephemeral" } };
+            }
+            return blocks;
+        }
+
+        async function callClaude({ system, content, maxTokens = MAX_TOKENS }) {
+            const headers = {
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerous-direct-browser-access": "true"
+            };
+            if (state.apiKey) headers["x-api-key"] = state.apiKey;
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: "user", content }] })
+            });
+            if (!res.ok) {
+                const detalhe = (await res.text()).slice(0, 200);
+                throw new Error(`Erro ${res.status}. ${detalhe}`);
+            }
+            const data = await res.json();
+            return data.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+        }
+
+        function parseAIJson(text) {
+            const clean = text.replace(/```json|```/g, "").trim();
+            const start = clean.indexOf("{"), end = clean.lastIndexOf("}");
+            if (start === -1 || end === -1) throw new Error("resposta sem JSON");
+            return JSON.parse(clean.slice(start, end + 1));
+        }
+
+        function transcriptText() {
+            if (!state.transcript.length) return "(reunião ainda sem falas)";
+            return state.transcript.slice(-40)
+                .map(t => `[${t.speaker}${t.role ? " – " + t.role : ""}]: ${t.text}`).join("\n");
+        }
+
+        async function askAgent(ag, instruction) {
+            const persona = `Você é ${ag.name}.
+Cargo: ${ag.role}.
+Personalidade: ${ag.personality || "analítico e independente"}.
+Sua MEMÓRIA (o que você já internalizou das falas do Dono e dos documentos): ${ag.memory || "(ainda vazia)"}`;
+            const text = `${persona}
+
+TRANSCRIÇÃO DA REUNIÃO ATÉ AGORA:
+${transcriptText()}
+
+TAREFA:
+${instruction}
+
+Devolva SOMENTE um JSON neste formato:
+{"fala": "sua contribuição, até 90 palavras, sem repetir o que já foi dito", "memoria": "resumo atualizado, até 120 palavras, do que você aprendeu com o Dono, as diretrizes e os documentos"}`;
+            const raw = await callClaude({
+                system: sharedSystemBlocks(),
+                content: [...buildDocBlocks(), { type: "text", text }]
+            });
+            return parseAIJson(raw);
+        }
+
+        function recordOwnerSpeech(text) {
+            state.ownerLaws.push(text);
+            state.transcript.push({ speaker: "DONO", role: "Autoridade Suprema", text });
+            appendOwnerDirectiveMessage(text);
+        }
+
+        function setButtonsDisabled(v) {
+            ["btnNextRound", "btnForceConsensus"].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) b.disabled = v;
+            });
+        }
+
+        function readAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(String(r.result).split(",")[1]);
+                r.onerror = () => reject(new Error("falha ao ler o arquivo"));
+                r.readAsDataURL(file);
+            });
+        }
+
+        function readAsTextFile(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(String(r.result));
+                r.onerror = () => reject(new Error("falha ao ler o arquivo"));
+                r.readAsText(file);
+            });
+        }
+
+        // Converte cada arquivo em blocos que o modelo consegue ler de verdade
+        async function readFileForAI(file) {
+            const lower = file.name.toLowerCase();
+            const header = { type: "text", text: `=== ARQUIVO: ${file.name} ===` };
+            if (lower.endsWith(".pdf")) {
+                return [header, { type: "document", source: { type: "base64", media_type: "application/pdf", data: await readAsBase64(file) } }];
+            }
+            if (/\.(png|jpe?g)$/.test(lower)) {
+                const media = lower.endsWith(".png") ? "image/png" : "image/jpeg";
+                return [header, { type: "image", source: { type: "base64", media_type: media, data: await readAsBase64(file) } }];
+            }
+            if (/\.(txt|csv)$/.test(lower)) {
+                const text = await readAsTextFile(file);
+                return [header, { type: "text", text: text.slice(0, 150000) }];
+            }
+            if (/\.(xlsx|xls)$/.test(lower)) {
+                if (typeof XLSX === "undefined") throw new Error("biblioteca de planilhas não carregou");
+                const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+                const partes = wb.SheetNames.map(s => `--- Planilha: ${s} ---\n${XLSX.utils.sheet_to_csv(wb.Sheets[s])}`);
+                return [header, { type: "text", text: partes.join("\n\n").slice(0, 150000) }];
+            }
+            throw new Error("formato não suportado");
+        }
+
+        function handleFilesSelected(fileList) {
+            Array.from(fileList).forEach(file => {
+                readFileForAI(file).then(blocks => {
+                    state.uploadedFiles.push({
+                        name: file.name,
+                        size: (file.size / 1024).toFixed(1) + " KB",
+                        type: file.type || file.name.split(".").pop().toUpperCase(),
+                        blocks
+                    });
+                    document.getElementById("fileCountBadge").innerText = state.uploadedFiles.length;
+                    renderUploadedFilesList();
+                }).catch(err => {
+                    appendSystemMessage(`⚠️ Não consegui ler ${escapeHtml(file.name)}: ${escapeHtml(err.message)}`);
+                });
+            });
+            document.getElementById("fileInputReal").value = "";
+        }
+
+        function renderUploadedFilesList() {
+            const lbl = document.getElementById("uploadCountLabel");
+            if (lbl) lbl.innerText = state.uploadedFiles.length;
+            const listEl = document.getElementById("uploadedFilesList");
+            if (state.uploadedFiles.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhum arquivo enviado ainda.</p>`;
+                return;
+            }
+            listEl.innerHTML = state.uploadedFiles.map((f, idx) => `
+                <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2 truncate">
+                        <i class="ph-fill ph-file-text text-cyan-400 text-base shrink-0"></i>
+                        <div class="truncate">
+                            <span class="font-bold text-white block truncate">${escapeHtml(f.name)}</span>
+                            <span class="text-[10px] text-slate-400">${f.size} • ${f.type}</span>
+                        </div>
+                    </div>
+                    <button onclick="state.uploadedFiles.splice(${idx}, 1); document.getElementById('fileCountBadge').innerText = state.uploadedFiles.length; renderUploadedFilesList();" class="text-slate-400 hover:text-rose-400 p-1">
+                        <i class="ph ph-trash text-sm"></i>
+                    </button>
+                </div>
+            `).join("");
+        }
+
+        /********************************************************************
+         * ALTERNÂNCIA DE MÓDULOS (GERAL VS. AUDITORIA MÉDICA)
+         ********************************************************************/
+        function switchAppModule(mod) {
+            state.activeModule = mod;
+            const btnGen = document.getElementById("modBtnGeneral");
+            const btnAud = document.getElementById("modBtnAudit");
+            const subGen = document.getElementById("subNavBarGeneral");
+            const subAud = document.getElementById("subNavBarAudit");
+            const rightIcon = document.getElementById("rightPanelIcon");
+            const rightTitle = document.getElementById("rightPanelTitle");
+            const rightBadge = document.getElementById("rightPanelBadge");
+            const emptyIcon = document.getElementById("emptyStateIcon");
+            const emptyTitle = document.getElementById("emptyStateTitle");
+            const emptyDesc = document.getElementById("emptyStateDesc");
+
+            if (mod === "GENERAL") {
+                btnGen.className = "px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-amber-500 text-slate-950 shadow";
+                btnAud.className = "px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition text-slate-300 hover:text-white";
+                subGen.classList.remove("hidden");
+                subAud.classList.add("hidden");
+                rightIcon.className = "ph-fill ph-crown text-xl text-amber-400";
+                rightTitle.innerText = "Conselho Supremo de IAs";
+                rightBadge.innerText = "Você é a Lei";
+                emptyIcon.className = "ph-duotone ph-buildings text-2xl text-amber-400";
+                emptyTitle.innerText = "Sua Empresa Está Viva!";
+                emptyDesc.innerHTML = "Os 10 agentes começam sem cargo fixo. Use o botão no topo para alternar para o <strong class='text-cyan-400'>Módulo de Auditoria Médica</strong> quando quiser!";
+                agents = agentsGeneral;
+                focusRoom("ALL");
+            } else {
+                btnAud.className = "px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-cyan-500 text-slate-950 shadow";
+                btnGen.className = "px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition text-slate-300 hover:text-white";
+                subAud.classList.remove("hidden");
+                subGen.classList.add("hidden");
+                rightIcon.className = "ph-fill ph-stethoscope text-xl text-cyan-400";
+                rightTitle.innerText = "Módulo de Auditoria de Contas Médicas";
+                rightBadge.innerText = "Equipe Técnica";
+                emptyIcon.className = "ph-duotone ph-stethoscope text-2xl text-cyan-400";
+                emptyTitle.innerText = "Equipe de Auditoria Médica Pronta!";
+                emptyDesc.innerHTML = "5 Enfermeiras Auditoras e 5 Faturistas especializados. Envie arquivos de contas médicas ou defina regras e personalidades (ex: relativista, pessoa do contra).";
+                agents = agentsAudit;
+                focusRoom("BOARDROOM");
+            }
+            renderDirectorsQuickBar();
+        }
+
+        /********************************************************************
+         * INICIALIZAÇÃO DOS AGENTES (GERAL + AUDITORIA)
+         ********************************************************************/
+        function initAgents() {
+            // Inicializar Geral
+            agentsGeneral.push({
+                id: "ceo_gen", isCEO: true, name: "VOCÊ (Dono)", role: "Autoridade Suprema", personality: "Líder geral", likes: 999, color: "#f59e0b", hairColor: "#fbbf24", skinColor: "#f1c27d", hairStyle: "crown", x: 23.2, y: 12.5, targetX: 23.2, targetY: 12.5, currentRoom: "Sala do Conselho", currentActivity: "Comandando a Empresa", state: "IDLE", walkCycle: 0, bubbleText: "", bubbleTimer: 0, isSpeakingNow: false, relationships: {}, newsFeed: ["👑 Fundou a sede."]
+            });
+            GENERAL_AGENTS_DATA.forEach((d, idx) => {
+                // Distribuir posições iniciais livremente pela Sala de TV e Cozinha
+                const startX = 4 + (idx % 5) * 2;
+                const startY = 4 + Math.floor(idx / 5) * 2;
+                agentsGeneral.push({
+                    ...d, role: "Sem Cargo Definido", personality: "Pensador livre e analítico", likes: 0, isCEO: false,
+                    x: startX, y: startY, targetX: startX, targetY: startY, currentRoom: "Sala de TV & Games", currentActivity: "Explorando a empresa", state: "IDLE", walkCycle: 0, bubbleText: "", bubbleTimer: 0, isSpeakingNow: false, relationships: {}, newsFeed: ["🏢 Chegou na empresa."]
+                });
+            });
+
+            // Inicializar Auditoria Médica
+            agentsAudit.push({
+                id: "ceo_aud", isCEO: true, name: "VOCÊ (Dono / Diretor Médico)", role: "Diretor Geral", personality: "Chefe supremo da auditoria", likes: 999, color: "#06b6d4", hairColor: "#0f172a", skinColor: "#ffdbac", hairStyle: "crown", x: 23.2, y: 12.5, targetX: 23.2, targetY: 12.5, currentRoom: "Sala de Reunião", currentActivity: "Liderando Auditoria", state: "IDLE", walkCycle: 0, bubbleText: "", bubbleTimer: 0, isSpeakingNow: false, relationships: {}, newsFeed: ["🏥 Assumiu o comando do Módulo de Auditoria de Contas Médicas."]
+            });
+            AUDIT_AGENTS_DATA.forEach((d, idx) => {
+                const seat = [
+                    { x: 15.2, y: 10.1 }, { x: 16.8, y: 10.1 }, { x: 18.4, y: 10.1 }, { x: 20.0, y: 10.1 }, { x: 21.6, y: 10.1 },
+                    { x: 15.2, y: 14.9 }, { x: 16.8, y: 14.9 }, { x: 18.4, y: 14.9 }, { x: 20.0, y: 14.9 }, { x: 21.6, y: 14.9 }
+                ][idx];
+                agentsAudit.push({
+                    ...d, likes: 0, isCEO: false,
+                    x: seat.x, y: seat.y, targetX: seat.x, targetY: seat.y, currentRoom: "Sala de Reunião", currentActivity: "Revisando Contas Médicas", state: "SEATED", walkCycle: 0, bubbleText: "", bubbleTimer: 0, isSpeakingNow: false, relationships: {}, newsFeed: [`📋 Atuando como ${d.role} (${d.isNurse ? 'Enfermeira Auditora' : 'Faturista'}). Personalidade: ${d.personality}`]
+                });
+            });
+
+            agents = agentsGeneral;
+            renderDirectorsQuickBar();
+        }
+
+        /********************************************************************
+         * CANVAS E RENDERIZAÇÃO ISOMÉTRICA
+         ********************************************************************/
+        const canvas = document.getElementById("officeCanvas");
+        const ctx = canvas.getContext("2d");
+        const TILE_W = 60;
+        const TILE_H = 30;
+
+        function isoToScreen(gx, gy, gz = 0) {
+            // Ajustado para garantir que a grade isométrica fique centralizada e visível em qualquer resolução
+            const originX = canvas.width / 2 + state.camera.x * 20;
+            const originY = canvas.height / 2 + state.camera.y * 10;
+            const sx = originX + (gx - gy) * (TILE_W / 2) * state.camera.zoom;
+            const sy = originY + ((gx + gy) * (TILE_H / 2) - gz) * state.camera.zoom;
+            return { x: sx, y: sy };
+        }
+
+        function drawIsoBox(gx, gy, gw, gh, heightZ, topColor, leftColor, rightColor, strokeColor = "rgba(15,23,42,0.35)") {
+            const p00 = isoToScreen(gx, gy, heightZ);
+            const p10 = isoToScreen(gx + gw, gy, heightZ);
+            const p11 = isoToScreen(gx + gw, gy + gh, heightZ);
+            const p01 = isoToScreen(gx, gy + gh, heightZ);
+            const b10 = isoToScreen(gx + gw, gy, 0);
+            const b11 = isoToScreen(gx + gw, gy + gh, 0);
+            const b01 = isoToScreen(gx, gy + gh, 0);
+
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = strokeColor;
+
+            ctx.fillStyle = leftColor;
+            ctx.beginPath();
+            ctx.moveTo(p01.x, p01.y); ctx.lineTo(p11.x, p11.y); ctx.lineTo(b11.x, b11.y); ctx.lineTo(b01.x, b01.y); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = rightColor;
+            ctx.beginPath();
+            ctx.moveTo(p10.x, p10.y); ctx.lineTo(p11.x, p11.y); ctx.lineTo(b11.x, b11.y); ctx.lineTo(b10.x, b10.y); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = topColor;
+            ctx.beginPath();
+            ctx.moveTo(p00.x, p00.y); ctx.lineTo(p10.x, p10.y); ctx.lineTo(p11.x, p11.y); ctx.lineTo(p01.x, p01.y); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+
+        function renderScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Piso estrutural básico
+            for (let x = 0; x < 26; x++) {
+                for (let y = 0; y < 18; y++) {
+                    const p0 = isoToScreen(x, y, 0);
+                    const p1 = isoToScreen(x + 1, y, 0);
+                    const p2 = isoToScreen(x + 1, y + 1, 0);
+                    const p3 = isoToScreen(x, y + 1, 0);
+                    ctx.fillStyle = (x + y) % 2 === 0 ? "#1e293b" : "#0f172a";
+                    ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y); ctx.closePath(); ctx.fill();
+                }
+            }
+
+            // Mesa de Reunião
+            drawIsoBox(14.8, 11.2, 7.4, 2.6, 16, state.activeModule === 'AUDIT' ? "#0e7490" : "#7c2d12", "#155e75", "#0891b2", "rgba(56,189,248,0.5)");
+            drawIsoBox(15.8, 11.8, 5.4, 1.4, 16.8, "#0f172a", "#1e293b", "#1e293b");
+
+            // Avatares
+            agents.forEach(ag => {
+                const zScale = state.camera.zoom;
+                const screenPos = isoToScreen(ag.x, ag.y, 0);
+                const sx = screenPos.x;
+                const sy = screenPos.y;
+
+                ctx.fillStyle = "rgba(0,0,0,0.4)";
+                ctx.beginPath(); ctx.ellipse(sx, sy, 12 * zScale, 6 * zScale, 0, 0, Math.PI * 2); ctx.fill();
+
+                ctx.fillStyle = ag.color;
+                ctx.beginPath(); ctx.roundRect(sx - 8.5 * zScale, sy - 30 * zScale, 17 * zScale, 19 * zScale, 7 * zScale); ctx.fill();
+
+                ctx.fillStyle = ag.skinColor;
+                ctx.beginPath(); ctx.ellipse(sx, sy - 40 * zScale, 8.5 * zScale, 9.5 * zScale, 0, 0, Math.PI * 2); ctx.fill();
+
+                // Nome e Cargo
+                ctx.font = `600 ${Math.max(9, Math.round(10 * zScale))}px Inter`;
+                ctx.textAlign = "center";
+                const label = ag.isCEO ? "👑 VOCÊ" : `${ag.name} • ${ag.role}${ag.likes > 0 ? ' ❤️'+ag.likes : ''}`;
+                const textW = ctx.measureText(label).width + 12;
+                ctx.fillStyle = "rgba(15,23,42,0.9)";
+                ctx.beginPath(); ctx.roundRect(sx - textW / 2, sy + 2 * zScale, textW, 14 * zScale, 4 * zScale); ctx.fill();
+                ctx.fillStyle = "#f8fafc"; ctx.fillText(label, sx, sy + 11 * zScale);
+
+                // Balão de fala
+                if (ag.bubbleText && ag.bubbleTimer > 0) {
+                    const bx = sx - 70;
+                    const by = sy - 75;
+                    ctx.fillStyle = "rgba(255,255,255,0.96)";
+                    ctx.strokeStyle = ag.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.roundRect(bx, by, 140, 26, 8); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = "#0f172a";
+                    ctx.font = "10px Inter";
+                    ctx.fillText(ag.bubbleText.substring(0, 30) + "...", sx, by + 16);
+                    ag.bubbleTimer--;
+                }
+            });
+        }
+
+        function gameLoop() {
+            renderScene();
+            requestAnimationFrame(gameLoop);
+        }
+
+
+        /********************************************************************
+         * INTERAÇÃO: SELEÇÃO DE AGENTES, INSPETOR, CURTIDAS, CARGOS E CÂMERA
+         ********************************************************************/
+        function escapeHtml(str) {
+            return String(str ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+        }
+
+        function findAgentById(id) {
+            return agents.find(a => a.id === id) || null;
+        }
+
+        function selectAgent(id) {
+            const ag = findAgentById(id);
+            if (!ag) return;
+            state.selectedAgentId = id;
+            const box = document.getElementById("inspColor");
+            box.style.backgroundColor = ag.color;
+            box.innerText = ag.name.replace(/^Enf\.\s*/, "").split(" ").slice(0, 2).map(p => p[0]).join("").toUpperCase();
+            document.getElementById("inspName").innerText = ag.name;
+            document.getElementById("inspRole").innerText = ag.role;
+            document.getElementById("inspState").innerText = ag.currentActivity || "";
+            document.getElementById("inspPersonalityInput").value = ag.personality || "";
+            refreshInspector();
+            document.getElementById("agentInspector").classList.remove("hidden");
+        }
+
+        function refreshInspector() {
+            const ag = findAgentById(state.selectedAgentId);
+            if (!ag) return;
+            const likes = ag.likes || 0;
+            document.getElementById("inspLikesCount").innerText = `${likes} ❤️`;
+            document.getElementById("inspPromoStatus").innerText = likes >= 3 ? "⭐ Destaque da equipe" : "Candidato Inicial";
+            document.getElementById("inspPromoBadge").innerText = ag.isCEO ? "Dono" : (ag.isNurse === true ? "Enfermeira" : (ag.isNurse === false ? "Faturista" : "Agente"));
+            document.getElementById("inspNewsFeed").innerHTML = (ag.newsFeed || []).slice().reverse()
+                .map(n => `<p class="text-[11px] text-slate-300">${escapeHtml(n)}</p>`).join("");
+        }
+
+        function closeInspector() {
+            state.selectedAgentId = null;
+            document.getElementById("agentInspector").classList.add("hidden");
+        }
+
+        function giveHeartToSelectedAgent() {
+            const ag = findAgentById(state.selectedAgentId);
+            if (!ag) return;
+            ag.likes = (ag.likes || 0) + 1;
+            ag.newsFeed = [...(ag.newsFeed || []), `❤️ O Dono gostou de uma ideia (total: ${ag.likes})`];
+            ag.bubbleText = "❤️ Gostei!";
+            ag.bubbleTimer = 200;
+            refreshInspector();
+        }
+
+        function updateAgentPersonalityFromInspector(value) {
+            const ag = findAgentById(state.selectedAgentId);
+            if (ag) ag.personality = value;
+        }
+
+        function updateAgentField(id, field, value) {
+            const ag = findAgentById(id);
+            if (ag) ag[field] = value;
+        }
+
+        function openSummonModal() {
+            const novo = prompt("Novo tema na mesa:", state.topic || "");
+            if (novo && novo.trim()) {
+                state.topic = novo.trim();
+                document.getElementById("agendaTextDisplay").innerText = state.topic;
+                appendSystemMessage("📌 Tema da reunião alterado.");
+            }
+        }
+
+        // Clique em avatar seleciona o agente; arrastar no canvas move a câmera
+        let isPanning = false, panMoved = false, lastMouseX = 0, lastMouseY = 0;
+        canvas.addEventListener("mousedown", e => {
+            isPanning = true; panMoved = false;
+            lastMouseX = e.clientX; lastMouseY = e.clientY;
+        });
+        window.addEventListener("mouseup", () => { isPanning = false; });
+        window.addEventListener("mousemove", e => {
+            if (!isPanning) return;
+            const dx = e.clientX - lastMouseX, dy = e.clientY - lastMouseY;
+            if (Math.abs(dx) + Math.abs(dy) > 3) panMoved = true;
+            state.camera.x += dx / 20;
+            state.camera.y += dy / 10;
+            lastMouseX = e.clientX; lastMouseY = e.clientY;
+        });
+        canvas.addEventListener("click", e => {
+            if (panMoved) return;
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            let hit = null, best = Infinity;
+            agents.forEach(ag => {
+                const p = isoToScreen(ag.x, ag.y, 0);
+                const d = Math.hypot(mx - p.x, my - (p.y - 25 * state.camera.zoom));
+                if (d < 28 * state.camera.zoom && d < best) { best = d; hit = ag; }
+            });
+            if (hit) selectAgent(hit.id);
+        });
+
+        function renderDirectorsQuickBar() {
+            const container = document.getElementById("directorsQuickBar");
+            // Se necessário exibir na barra inferior
+        }
+
+        function openKnowledgeBaseModal() {
+            document.getElementById("knowledgeBaseModal").classList.remove("hidden");
+            document.getElementById("kbStandardsInput").value = state.knowledgeBaseStandards;
+        }
+
+        function closeKnowledgeBaseModal() {
+            state.knowledgeBaseStandards = document.getElementById("kbStandardsInput").value;
+            document.getElementById("knowledgeBaseModal").classList.add("hidden");
+            appendSystemMessage("🧠 Base de Conhecimento e Padrões do Dono atualizados! A equipe assimilou as novas diretrizes.");
+        }
+
+        function openRolesModal() {
+            const container = document.getElementById("rolesListContainer");
+            container.innerHTML = agents.filter(a => !a.isCEO).map(ag => `
+                <div class="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-white text-xs">${ag.name}</span>
+                        <input type="text" value="${ag.role}" onchange="updateAgentField('${ag.id}', 'role', this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white selectable-text">
+                    </div>
+                    <textarea rows="2" onchange="updateAgentField('${ag.id}', 'personality', this.value)" class="bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-300 selectable-text" placeholder="Personalidade (ex: pessoa do contra, relativista...)">${ag.personality}</textarea>
+                </div>
+            `).join("");
+            document.getElementById("rolesModal").classList.remove("hidden");
+        }
+
+        function closeRolesModal() {
+            document.getElementById("rolesModal").classList.add("hidden");
+        }
+
+        /********************************************************************
+         * DEBATE COM GEMINI API & FALLBACK DE AUDITORIA MÉDICA
+         ********************************************************************/
+        function startBoardMeeting(topic) {
+            state.topic = topic;
+            state.round = 0;
+            state.consensus = 40;
+            state.transcript = [];
+            state.ownerLaws = [];
+            recordOwnerSpeech(topic);
+            document.getElementById("emptyStatePanel").classList.add("hidden");
+            document.getElementById("activeAgendaBanner").classList.remove("hidden");
+            document.getElementById("agendaTextDisplay").innerText = topic;
+            document.getElementById("meetingActionButtons").classList.remove("hidden");
+            triggerNextRound();
+        }
+
+        function quickStartTopic(topic) {
+            startBoardMeeting(topic);
+        }
+
+        async function triggerNextRound() {
+            if (state.isGeneratingAI || !state.topic) return;
+            state.isGeneratingAI = true;
+            state.round++;
+            setButtonsDisabled(true);
+            appendRoundDivider(`RODADA ${state.round}`);
+            const team = getAgentsForModule();
+            setThinkingUI(true, `${team.length} funcionários lendo o contexto e pensando...`);
+            const instruction = `Rodada ${state.round} da reunião sobre: "${state.topic}". Considere a última fala do Dono e os documentos anexados. Traga uma contribuição concreta e diferente das que já foram ditas, ou discorde de algo com argumentos.`;
+            const falhas = [];
+            try {
+                const results = await Promise.allSettled(team.map(async ag => ({ ag, r: await askAgent(ag, instruction) })));
+                results.forEach(res => {
+                    if (res.status === "rejected") {
+                        falhas.push(res.reason?.message || String(res.reason));
+                        return;
+                    }
+                    const { ag, r } = res.value;
+                    const fala = String(r.fala || "").trim();
+                    ag.memory = String(r.memoria || ag.memory || "");
+                    ag.bubbleText = fala.slice(0, 40);
+                    ag.bubbleTimer = 260;
+                    ag.newsFeed = [...(ag.newsFeed || []), `💬 Rodada ${state.round}: ${fala.slice(0, 80)}`];
+                    state.transcript.push({ speaker: ag.name, role: ag.role, text: fala });
+                    appendDirectorSpeechCard(ag, escapeHtml(fala).replace(/\n/g, "<br>"), ag.role);
+                });
+                if (falhas.length) {
+                    appendSystemMessage(`⚠️ ${falhas.length} de ${team.length} funcionários não responderam. Erro: ${escapeHtml(falhas[0])}`);
+                }
+            } finally {
+                setThinkingUI(false);
+                state.isGeneratingAI = false;
+                setButtonsDisabled(false);
+            }
+        }
+
+        async function triggerConsensusSynthesis() {
+            if (state.isGeneratingAI || !state.transcript.length) return;
+            state.isGeneratingAI = true;
+            setButtonsDisabled(true);
+            setThinkingUI(true, "Consolidando o parecer final com base em todas as falas e documentos...");
+            try {
+                const text = `TRANSCRIÇÃO COMPLETA DA REUNIÃO:\n${transcriptText()}\n\nTAREFA: Você é o consolidador. Produza o PARECER FINAL: síntese das melhores ideias, pontos de divergência, recomendação prática e próximos passos, citando o que está nos documentos. Devolva SOMENTE um JSON: {"parecer": "texto do parecer, até 250 palavras", "consenso": número de 0 a 100 indicando o alinhamento real entre as IAs, "proximos_passos": "lista curta em texto"}`;
+                const raw = await callClaude({
+                    system: sharedSystemBlocks(),
+                    content: [...buildDocBlocks(), { type: "text", text }],
+                    maxTokens: 1500
+                });
+                const r = parseAIJson(raw);
+                appendRoundDivider("✨ PARECER TÉCNICO & CONSENSO FINAL");
+                const corpo = escapeHtml(`${r.parecer}\n\nPróximos passos: ${r.proximos_passos}`).replace(/\n/g, "<br>");
+                appendDirectorSpeechCard({ id: "consolidador", name: "Consolidador", role: "Síntese" }, corpo, "Consenso", true);
+                updateConsensusBar(Math.max(0, Math.min(100, Math.round(Number(r.consenso) || 0))));
+            } catch (err) {
+                appendSystemMessage(`⚠️ Não foi possível gerar o parecer: ${escapeHtml(err.message)}`);
+            } finally {
+                setThinkingUI(false);
+                state.isGeneratingAI = false;
+                setButtonsDisabled(false);
+            }
+        }
+
+        function endMeeting() {
+            document.getElementById("meetingActionButtons").classList.add("hidden");
+            state.round = 0;
+            document.getElementById("activeAgendaBanner").classList.add("hidden");
+            appendSystemMessage("Sessão encerrada.");
+        }
+
+        function handleOwnerCommandSubmit() {
+            const input = document.getElementById("ownerCommandInput");
+            const val = input.value.trim();
+            if (!val || state.isGeneratingAI) return;
+            input.value = "";
+            if (state.round === 0) {
+                startBoardMeeting(val);
+            } else {
+                recordOwnerSpeech(val);
+                triggerNextRound();
+            }
+        }
+
+        function setThinkingUI(isThinking, text="") {
+            const ind = document.getElementById("aiThinkingIndicator");
+            document.getElementById("thinkingText").innerText = text;
+            if(isThinking) ind.classList.remove("hidden"); else ind.classList.add("hidden");
+        }
+
+        function appendSystemMessage(text) {
+            const chat = document.getElementById("chatContainer");
+            chat.innerHTML += `<div class="bg-slate-800/70 border border-slate-700/80 rounded-xl px-3.5 py-2 text-[11px] text-slate-300">ℹ️ ${text}</div>`;
+        }
+
+        function appendRoundDivider(title) {
+            const chat = document.getElementById("chatContainer");
+            chat.innerHTML += `<div class="flex items-center gap-2 py-1"><div class="h-[1px] flex-1 bg-slate-800"></div><span class="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-400">${title}</span><div class="h-[1px] flex-1 bg-slate-800"></div></div>`;
+        }
+
+        function appendOwnerDirectiveMessage(text) {
+            const chat = document.getElementById("chatContainer");
+            chat.innerHTML += `<div class="bg-amber-500/20 border border-amber-500/60 rounded-2xl p-3 text-xs text-white">👑 <strong>Dono:</strong> ${escapeHtml(text)}</div>`;
+        }
+
+        function appendDirectorSpeechCard(dir, text, stance, isFinal=false) {
+            const chat = document.getElementById("chatContainer");
+            chat.innerHTML += `
+                <div class="${isFinal ? 'bg-emerald-950/50 border-emerald-500' : 'bg-slate-800/60 border-slate-700'} border rounded-2xl p-3.5 text-xs text-slate-200 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-white cursor-pointer hover:text-amber-300" onclick="selectAgent('${dir.id}')">${dir.name} (${dir.role})</span>
+                        <button onclick="selectAgent('${dir.id}'); giveHeartToSelectedAgent()" class="text-rose-400 font-bold">❤️ Gostei</button>
+                    </div>
+                    <p class="pl-2">${text}</p>
+                </div>
+            `;
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function updateConsensusBar(val) {
+            state.consensus = val;
+            document.getElementById("consensusValue").innerText = `${val}%`;
+            document.getElementById("consensusBar").style.width = `${val}%`;
+        }
+
+        window.onload = function() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width; 
+            canvas.height = rect.height;
+            initAgents();
+            gameLoop();
+        };
+
+        window.addEventListener('resize', () => {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        });
+    </script>
+</body>
+</html>
